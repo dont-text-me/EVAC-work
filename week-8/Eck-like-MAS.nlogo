@@ -171,6 +171,7 @@ to endOfCycle
     print eaten-in-all-ticks
     file-open "ticks.txt"
     file-write eaten-in-all-ticks
+    file-close
   ]
   set eaten-in-all-ticks []
 end
