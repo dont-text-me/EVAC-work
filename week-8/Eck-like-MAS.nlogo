@@ -29,6 +29,8 @@ animals-own
   currentState ;; what is the current state they are in
   points ;; how much food have they eaten this cycle
   generation ;; what generation they are from
+  extended-fitness
+  fitness
 ]
 
 
@@ -54,7 +56,6 @@ to setup
   if walls-on [setup-walls]
   create-foods (round (world-width * world-height * 0.04)) [setup-foods foodSpawnPattern] ;;should adapt to create food relative to size of map
   create-animals population [setup-animals]
-
 
 end
 
@@ -110,7 +111,8 @@ to setup-animals
   set color yellow
   set heading 90 * (random 4)
   set points 0
-
+  set extended-fitness 0
+  set fitness 0
   while [any? other turtles-here or pcolor = white]
   [
     setxy random-pxcor random-pycor
@@ -156,12 +158,41 @@ end
 to endOfCycle
   print word "Generation: " currentGeneration
   let sumFitness 0
-  ask animals [set sumFitness (sumFitness + points)]
+  let sumPlants 0
+  ;;calculate f3-fitnesses
+  ask animals[
+    let extFitness 0
+    foreach chromosome [[locus] ->
+      let locusFitness 0
+      let numMatches 0
+      ask other animals[
+        foreach chromosome [[otherLocus] ->
+          if ((item 0 locus = item 0 otherLocus) and (item 1 locus = item 1 otherLocus)) [
+            set numMatches numMatches + 1
+            set locusFitness locusFitness + points
+          ]
+        ]
+     ]
+      ifelse numMatches = 0
+      [set locusFitness 0]
+      [
+        set locusFitness (locusFitness / (numMatches * length chromosome))
+      ]
+      set extFitness extFitness + locusFitness
+    ]
+    set extended-fitness points + extFitness
+  ]
+  ask animals [
+    set sumPlants sumPlants + points
+    ;;set fitness points
+    set fitness extended-fitness
+    set sumFitness (sumFitness + fitness)
+  ]
   set averageFitness (sumFitness / population)
   print word "Average Fitness: " averageFitness
   if averageFitness > highest-avg-fitness [set highest-avg-fitness averageFitness]
   hatchNextGeneration
-  set total-eaten-plants (total-eaten-plants + sumFitness)
+  set total-eaten-plants (total-eaten-plants + sumPlants)
   print word "Moves resulting in food eaten: " moves-harvesting-food
   print word "Moves where no food was eaten: " moves-blank
   set moves-harvesting-food 0
@@ -185,7 +216,7 @@ to hatchNextGeneration
 
   ask tempSet
   [
-    if points > highest-individual-score [set highest-individual-score points]
+    if fitness > highest-individual-score [set highest-individual-score fitness]
     if averageFitness = 0 [set points 1]
   ]
 
@@ -198,7 +229,7 @@ to hatchNextGeneration
       if count animals < (population * 2)
       [
 
-        if (points / averageFitness) > random-float 1
+        if (fitness / averageFitness) > random-float 1
         [
           hatch-animals 1 [setup-animals]
         ]
@@ -236,6 +267,7 @@ to-report mutate-chromosome
     ]
   report stateBlock
 end
+
 
 
 to crossOver
@@ -492,7 +524,7 @@ mutationChance
 mutationChance
 0
 0.25
-0.02
+0.03
 0.01
 1
 NIL
